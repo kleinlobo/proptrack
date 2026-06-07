@@ -12,12 +12,25 @@ CREATE TABLE public.expense_categories (
   updated_at TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   deleted_at TIMESTAMPTZ,
   deleted_by UUID          REFERENCES public.user_profiles(id),
-  CONSTRAINT expense_categories_slug_unique UNIQUE (slug),
-  CONSTRAINT expense_categories_max_depth CHECK (
-    parent_id IS NULL OR
-    (SELECT parent_id FROM public.expense_categories ec2
-     WHERE ec2.id = expense_categories.parent_id) IS NULL
-  )
+  CONSTRAINT expense_categories_slug_unique UNIQUE (slug)
 );
 
 CREATE INDEX idx_categories_parent ON public.expense_categories(parent_id);
+
+-- Enforce max 2 levels (top-level and one child level) via trigger
+-- because PostgreSQL does not allow subqueries in CHECK constraints
+CREATE OR REPLACE FUNCTION public.check_category_max_depth()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.parent_id IS NOT NULL THEN
+    IF (SELECT parent_id FROM public.expense_categories WHERE id = NEW.parent_id) IS NOT NULL THEN
+      RAISE EXCEPTION 'expense_categories only supports two levels (parent must be a top-level category)';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_expense_categories_max_depth
+  BEFORE INSERT OR UPDATE OF parent_id ON public.expense_categories
+  FOR EACH ROW EXECUTE FUNCTION public.check_category_max_depth();

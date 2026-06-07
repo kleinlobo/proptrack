@@ -1,6 +1,6 @@
 -- Migration: 0008_create_expense_records.sql
 -- Core financial table. Every property expense — manual and recurring. Audit triggered in 0016.
--- Note: recurring_id FK to recurring_expenses added in 0016 (circular dependency — 0009 created after this)
+-- Note: recurring_id FK to recurring_expenses added in 0009 (circular dependency).
 
 CREATE TABLE public.expense_records (
   id                  UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -32,12 +32,6 @@ CREATE TABLE public.expense_records (
   CONSTRAINT expense_payment_check    CHECK (payment_method IN (
     'bank_transfer','cash','credit_card','cheque','online_payment','other')),
   CONSTRAINT expense_status_check     CHECK (status IN ('pending_confirmation','confirmed')),
-  CONSTRAINT expense_room_property    CHECK (
-    room_id IS NULL OR EXISTS (
-      SELECT 1 FROM public.rooms r
-      WHERE r.id = room_id AND r.property_id = expense_records.property_id
-    )
-  ),
   CONSTRAINT expense_recurring_flag   CHECK (
     (is_recurring = TRUE AND recurring_id IS NOT NULL) OR
     (is_recurring = FALSE)
@@ -50,3 +44,24 @@ CREATE INDEX idx_expense_category      ON public.expense_records(category_id)   
 CREATE INDEX idx_expense_status        ON public.expense_records(status)                 WHERE deleted_at IS NULL;
 CREATE INDEX idx_expense_recurring     ON public.expense_records(recurring_id)           WHERE deleted_at IS NULL;
 CREATE INDEX idx_expense_created_by    ON public.expense_records(created_by)             WHERE deleted_at IS NULL;
+
+-- Enforce room belongs to the same property via trigger
+-- (PostgreSQL does not allow subqueries in CHECK constraints)
+CREATE OR REPLACE FUNCTION public.check_expense_room_property()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.room_id IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM public.rooms r
+      WHERE r.id = NEW.room_id AND r.property_id = NEW.property_id
+    ) THEN
+      RAISE EXCEPTION 'room_id % does not belong to property_id %', NEW.room_id, NEW.property_id;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_expense_room_property
+  BEFORE INSERT OR UPDATE OF room_id, property_id ON public.expense_records
+  FOR EACH ROW EXECUTE FUNCTION public.check_expense_room_property();
