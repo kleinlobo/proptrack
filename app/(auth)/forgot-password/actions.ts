@@ -22,7 +22,7 @@ export async function forgotPasswordAction(
 
   // Always return success even if email doesn't exist — prevents user enumeration
   await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${appUrl}/set-password`,
+    redirectTo: `${appUrl}/auth/confirm`,
   });
 
   return { success: true };

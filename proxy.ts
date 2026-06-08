@@ -1,8 +1,10 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const AUTH_ROUTES = ['/login', '/forgot-password', '/set-password'];
-const PUBLIC_ROUTES = ['/access-denied', ...AUTH_ROUTES];
+// Routes that redirect authenticated users away (they don't need them once logged in)
+const AUTH_ROUTES = ['/login', '/forgot-password'];
+// Routes that are accessible without authentication
+const PUBLIC_ROUTES = ['/access-denied', '/auth/confirm', '/set-password', ...AUTH_ROUTES];
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

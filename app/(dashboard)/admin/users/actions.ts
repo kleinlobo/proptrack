@@ -47,9 +47,13 @@ export async function inviteUser(_prev: ActionState, formData: FormData): Promis
   );
 
   // Invite user via Supabase Auth Admin API
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://proptrack-six.vercel.app';
   const { data: inviteData, error: inviteErr } = await serviceClient.auth.admin.inviteUserByEmail(
     parsed.data.email,
-    { data: { full_name: parsed.data.full_name, role: parsed.data.role } }
+    {
+      data: { full_name: parsed.data.full_name, role: parsed.data.role },
+      redirectTo: `${appUrl}/auth/confirm`,
+    }
   );
 
   if (inviteErr) {
