@@ -11,60 +11,59 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useMonthlyChartData } from '@/hooks/use-dashboard';
-import { formatCurrency } from '@/lib/currency/convert';
 
 interface Props {
   propertyIds: string[] | null;
 }
 
-function ChartSkeleton() {
-  return (
-    <div
-      className="h-64 bg-neutral-100 dark:bg-neutral-700 rounded-md animate-pulse"
-      aria-busy="true"
-    />
-  );
-}
-
-function EmptyChart() {
-  return (
-    <div className="h-64 flex flex-col items-center justify-center text-center">
-      <p className="text-sm text-[var(--color-neutral-500)]">No data for this period</p>
-    </div>
-  );
+function fmt(v: number) {
+  return v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(Math.round(v));
 }
 
 export function RevenueExpensesChart({ propertyIds }: Props) {
   const { data, isLoading } = useMonthlyChartData(propertyIds);
 
-  const isEmpty = !isLoading && (!data || data.every((d) => d.revenue === 0 && d.expenses === 0));
+  const isEmpty =
+    !isLoading &&
+    (!data ||
+      data.every(
+        (d) =>
+          d.revenue_AED === 0 &&
+          d.revenue_INR === 0 &&
+          d.expenses_AED === 0 &&
+          d.expenses_INR === 0
+      ));
 
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-md shadow-sm border border-neutral-100 dark:border-neutral-700 p-6">
-      <p className="text-base font-semibold text-[var(--color-neutral-900)] mb-1">
+      <p className="text-base font-semibold text-[var(--color-neutral-900)] mb-0.5">
         Revenue vs Expenses
       </p>
-      <p className="text-sm text-[var(--color-neutral-500)] mb-6">Last 12 months</p>
+      <p className="text-xs text-[var(--color-neutral-500)] mb-5">
+        Last 12 months · AED (solid) &amp; INR (hatched)
+      </p>
 
       {isLoading ? (
-        <ChartSkeleton />
+        <div className="h-64 bg-neutral-100 rounded-md animate-pulse" aria-busy="true" />
       ) : isEmpty ? (
-        <EmptyChart />
+        <div className="h-64 flex items-center justify-center">
+          <p className="text-sm text-[var(--color-neutral-500)]">No data for this period</p>
+        </div>
       ) : (
         <ResponsiveContainer width="100%" height={256}>
-          <BarChart data={data} barGap={4}>
+          <BarChart data={data} barCategoryGap="30%" barGap={2}>
             <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
             <XAxis
               dataKey="month"
-              tick={{ fontSize: 12, fill: '#6B7280', fontFamily: 'DM Sans' }}
+              tick={{ fontSize: 11, fill: '#6B7280', fontFamily: 'DM Sans' }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
-              tick={{ fontSize: 12, fill: '#6B7280', fontFamily: 'DM Sans' }}
+              tick={{ fontSize: 11, fill: '#6B7280', fontFamily: 'DM Sans' }}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))}
+              tickFormatter={fmt}
             />
             <Tooltip
               contentStyle={{
@@ -75,17 +74,24 @@ export function RevenueExpensesChart({ propertyIds }: Props) {
                 fontFamily: 'DM Sans',
                 fontSize: 12,
               }}
-              formatter={(value: number) =>
-                [value.toLocaleString(undefined, { maximumFractionDigits: 0 }), '']
-              }
+              formatter={(value: number, name: string) => [
+                name.includes('INR') || name.includes('₹')
+                  ? `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+                  : `AED ${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+                name,
+              ]}
             />
             <Legend
               iconType="square"
               iconSize={10}
-              wrapperStyle={{ fontSize: 12, color: '#6B7280', fontFamily: 'DM Sans' }}
+              wrapperStyle={{ fontSize: 11, color: '#6B7280', fontFamily: 'DM Sans' }}
             />
-            <Bar dataKey="revenue" name="Revenue" fill="#276EAC" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="expenses" name="Expenses" fill="#F59E0B" radius={[2, 2, 0, 0]} />
+            {/* Revenue stack — blue shades */}
+            <Bar dataKey="revenue_AED" name="Revenue (AED)" stackId="rev" fill="#276EAC" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="revenue_INR" name="Revenue (₹)" stackId="rev" fill="#7CB9E8" radius={[2, 2, 0, 0]} />
+            {/* Expenses stack — amber shades */}
+            <Bar dataKey="expenses_AED" name="Expenses (AED)" stackId="exp" fill="#D97706" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="expenses_INR" name="Expenses (₹)" stackId="exp" fill="#FCD34D" radius={[2, 2, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       )}

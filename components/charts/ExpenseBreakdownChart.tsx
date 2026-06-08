@@ -1,10 +1,11 @@
 'use client';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+import { useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useExpenseCategoryBreakdown } from '@/hooks/use-dashboard';
 import type { DateRange } from '@/lib/date-utils';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 interface Props {
   range: DateRange;
@@ -16,8 +17,10 @@ const SLICE_COLORS = ['#3B82F6', '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6', '#9
 export function ExpenseBreakdownChart({ range, propertyIds }: Props) {
   const { data, isLoading } = useExpenseCategoryBreakdown(range, propertyIds);
   const router = useRouter();
+  const [currency, setCurrency] = useState<'aed' | 'inr'>('aed');
 
-  const isEmpty = !isLoading && (!data || data.length === 0 || data.every((d) => d.value === 0));
+  const activeData = (currency === 'aed' ? data?.aed : data?.inr) ?? [];
+  const isEmpty = !isLoading && activeData.every((d) => d.value === 0);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function handleSliceClick(sectorData: any) {
@@ -26,24 +29,57 @@ export function ExpenseBreakdownChart({ range, propertyIds }: Props) {
     router.push(`/expenses?category=${encodeURIComponent(name)}`);
   }
 
+  const hasAED = (data?.aed ?? []).some((d) => d.value > 0);
+  const hasINR = (data?.inr ?? []).some((d) => d.value > 0);
+
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-md shadow-sm border border-neutral-100 dark:border-neutral-700 p-6">
-      <p className="text-base font-semibold text-[var(--color-neutral-900)] mb-1">
-        Expense Breakdown
-      </p>
-      <p className="text-sm text-[var(--color-neutral-500)] mb-6">By category, current period</p>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-base font-semibold text-[var(--color-neutral-900)]">
+          Expense Breakdown
+        </p>
+        {!isLoading && (hasAED || hasINR) && (
+          <div className="flex rounded-md border border-neutral-200 overflow-hidden text-xs font-medium">
+            <button
+              onClick={() => setCurrency('aed')}
+              className={cn(
+                'px-2.5 py-1 transition-colors',
+                currency === 'aed'
+                  ? 'bg-[#276EAC] text-white'
+                  : 'bg-white text-neutral-500 hover:bg-neutral-50'
+              )}
+            >
+              AED
+            </button>
+            <button
+              onClick={() => setCurrency('inr')}
+              className={cn(
+                'px-2.5 py-1 transition-colors border-l border-neutral-200',
+                currency === 'inr'
+                  ? 'bg-[#059669] text-white'
+                  : 'bg-white text-neutral-500 hover:bg-neutral-50'
+              )}
+            >
+              INR
+            </button>
+          </div>
+        )}
+      </div>
+      <p className="text-sm text-[var(--color-neutral-500)] mb-4">By category, current period</p>
 
       {isLoading ? (
         <div className="h-64 bg-neutral-100 dark:bg-neutral-700 rounded-md animate-pulse" aria-busy="true" />
       ) : isEmpty ? (
         <div className="h-64 flex items-center justify-center">
-          <p className="text-sm text-[var(--color-neutral-500)]">No data for this period</p>
+          <p className="text-sm text-[var(--color-neutral-500)]">
+            No {currency === 'aed' ? 'AED' : 'INR'} expenses for this period
+          </p>
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={256}>
           <PieChart>
             <Pie
-              data={data}
+              data={activeData}
               cx="50%"
               cy="50%"
               innerRadius={60}
@@ -53,7 +89,7 @@ export function ExpenseBreakdownChart({ range, propertyIds }: Props) {
               onClick={handleSliceClick}
               className="cursor-pointer"
             >
-              {(data ?? []).map((_entry, index) => (
+              {activeData.map((_entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={SLICE_COLORS[index % SLICE_COLORS.length]}
@@ -70,7 +106,9 @@ export function ExpenseBreakdownChart({ range, propertyIds }: Props) {
                 fontSize: 12,
               }}
               formatter={(value: number) => [
-                value.toLocaleString(undefined, { maximumFractionDigits: 0 }),
+                currency === 'aed'
+                  ? `AED ${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+                  : `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
                 '',
               ]}
             />

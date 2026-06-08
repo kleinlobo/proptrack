@@ -1,0 +1,68 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Supabase Cron Schedules for Edge Functions
+-- Requires pg_cron extension (enabled by default on Supabase)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- fetch-exchange-rates: runs daily at 00:05 UTC
+SELECT cron.schedule(
+  'fetch-exchange-rates-daily',
+  '5 0 * * *',
+  $$
+    SELECT net.http_post(
+      url := current_setting('app.supabase_url') || '/functions/v1/fetch-exchange-rates',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || current_setting('app.service_role_key'),
+        'Content-Type', 'application/json'
+      ),
+      body := '{}'::jsonb
+    );
+  $$
+);
+
+-- generate-recurring: runs daily at 01:00 UTC (after exchange rates are fresh)
+SELECT cron.schedule(
+  'generate-recurring-daily',
+  '0 1 * * *',
+  $$
+    SELECT net.http_post(
+      url := current_setting('app.supabase_url') || '/functions/v1/generate-recurring',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || current_setting('app.service_role_key'),
+        'Content-Type', 'application/json'
+      ),
+      body := '{}'::jsonb
+    );
+  $$
+);
+
+-- check-overdue-recurring: runs daily at 09:00 UTC
+SELECT cron.schedule(
+  'check-overdue-recurring-daily',
+  '0 9 * * *',
+  $$
+    SELECT net.http_post(
+      url := current_setting('app.supabase_url') || '/functions/v1/check-overdue-recurring',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || current_setting('app.service_role_key'),
+        'Content-Type', 'application/json'
+      ),
+      body := '{}'::jsonb
+    );
+  $$
+);
+
+-- check-missing-income: runs on the 5th of each month at 08:00 UTC
+SELECT cron.schedule(
+  'check-missing-income-monthly',
+  '0 8 5 * *',
+  $$
+    SELECT net.http_post(
+      url := current_setting('app.supabase_url') || '/functions/v1/check-missing-income',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || current_setting('app.service_role_key'),
+        'Content-Type', 'application/json'
+      ),
+      body := '{}'::jsonb
+    );
+  $$
+);

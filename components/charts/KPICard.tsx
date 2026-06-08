@@ -8,6 +8,8 @@ interface KPICardProps {
   title: string;
   primaryValue: string;
   secondaryValue?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
   trend?: { pct: number; label: string };
   accentColor: string;
   iconBg: string;
@@ -30,6 +32,8 @@ export function KPICard({
   title,
   primaryValue,
   secondaryValue,
+  primaryColor,
+  secondaryColor,
   trend,
   accentColor,
   iconBg,
@@ -41,6 +45,8 @@ export function KPICard({
   if (loading) return <KPICardSkeleton />;
 
   const isPositiveTrend = trend && trend.pct >= 0;
+  const hasBoth = Boolean(secondaryValue);
+  const valueSize = hasBoth ? 'text-xl' : 'text-2xl';
 
   return (
     <div
@@ -57,11 +63,19 @@ export function KPICard({
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-[var(--color-neutral-500)] mb-1">{title}</p>
-          <p className="text-3xl font-bold text-[var(--color-neutral-900)] tabular-nums">
+          <p
+            className={cn(valueSize, 'font-bold tabular-nums truncate')}
+            style={{ color: primaryColor ?? 'var(--color-neutral-900)' }}
+          >
             {primaryValue}
           </p>
           {secondaryValue && (
-            <p className="text-sm text-[var(--color-neutral-500)] mt-1">{secondaryValue}</p>
+            <p
+              className={cn(valueSize, 'font-bold tabular-nums truncate mt-0.5')}
+              style={{ color: secondaryColor ?? 'var(--color-neutral-500)' }}
+            >
+              {secondaryValue}
+            </p>
           )}
         </div>
         <div className={cn('p-2.5 rounded-md flex-shrink-0 ml-3', iconBg)}>

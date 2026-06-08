@@ -11,6 +11,8 @@ import {
   Building2,
   Users,
   Settings,
+  Bell,
+  ClipboardList,
   ChevronRight,
   X,
 } from 'lucide-react';
@@ -33,9 +35,11 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Expenses', href: '/expenses', icon: Receipt },
   { label: 'Recurring', href: '/expenses/recurring', icon: RefreshCw },
   { label: 'Reports', href: '/reports', icon: FileBarChart },
-  { label: 'Properties', href: '/properties', icon: Building2, adminOnly: true },
-  { label: 'Users', href: '/users', icon: Users, adminOnly: true },
-  { label: 'Settings', href: '/settings', icon: Settings, adminOnly: true },
+  { label: 'Notifications', href: '/notifications', icon: Bell },
+  { label: 'Properties', href: '/admin/properties', icon: Building2, adminOnly: true },
+  { label: 'Users', href: '/admin/users', icon: Users, adminOnly: true },
+  { label: 'Audit Log', href: '/audit-log', icon: ClipboardList, adminOnly: true },
+  { label: 'Settings', href: '/admin/settings', icon: Settings, adminOnly: true },
 ];
 
 function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {

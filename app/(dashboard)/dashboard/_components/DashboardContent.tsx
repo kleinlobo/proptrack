@@ -24,22 +24,32 @@ interface Props {
   fySettings?: FYSettings;
 }
 
-function formatKPIValue(aed: number, inr: number): { primary: string; secondary: string | undefined } {
+const AED_COLOR = '#276EAC';
+const INR_COLOR = '#059669';
+
+function formatKPIValue(aed: number, inr: number): {
+  primary: string;
+  primaryColor: string;
+  secondary?: string;
+  secondaryColor?: string;
+} {
   const hasAED = aed !== 0;
   const hasINR = inr !== 0;
 
   if (hasAED && hasINR) {
     return {
       primary: formatCurrency(aed, 'AED'),
+      primaryColor: AED_COLOR,
       secondary: formatCurrency(inr, 'INR'),
+      secondaryColor: INR_COLOR,
     };
   }
   if (hasINR) {
-    return { primary: formatCurrency(inr, 'INR'), secondary: undefined };
+    return { primary: formatCurrency(inr, 'INR'), primaryColor: INR_COLOR };
   }
   return {
     primary: formatCurrency(aed, 'AED'),
-    secondary: hasINR ? formatCurrency(inr, 'INR') : undefined,
+    primaryColor: AED_COLOR,
   };
 }
 
@@ -111,7 +121,9 @@ export function DashboardContent({ role, propertyIds, fySettings }: Props) {
           <KPICard
             title="Total Revenue"
             primaryValue={revenueKPI.primary}
+            primaryColor={revenueKPI.primaryColor}
             secondaryValue={revenueKPI.secondary}
+            secondaryColor={revenueKPI.secondaryColor}
             accentColor="#276EAC"
             iconBg="bg-blue-50"
             iconColor="text-[#276EAC]"
@@ -125,7 +137,9 @@ export function DashboardContent({ role, propertyIds, fySettings }: Props) {
           <KPICard
             title="Total Expenses"
             primaryValue={expenseKPI.primary}
+            primaryColor={expenseKPI.primaryColor}
             secondaryValue={expenseKPI.secondary}
+            secondaryColor={expenseKPI.secondaryColor}
             accentColor="#B45A00"
             iconBg="bg-amber-50"
             iconColor="text-amber-700"
@@ -139,7 +153,9 @@ export function DashboardContent({ role, propertyIds, fySettings }: Props) {
           <KPICard
             title="Net Profit"
             primaryValue={profitKPI.primary}
+            primaryColor={profitKPI.primaryColor}
             secondaryValue={profitKPI.secondary}
+            secondaryColor={profitKPI.secondaryColor}
             accentColor={isProfitPositive ? '#146B3A' : '#9B1C1C'}
             iconBg={isProfitPositive ? 'bg-emerald-50' : 'bg-red-50'}
             iconColor={isProfitPositive ? 'text-emerald-700' : 'text-red-700'}
