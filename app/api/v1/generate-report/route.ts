@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     date_from: string;
     date_to: string;
     property_ids?: string[];
+    stream?: boolean;
   };
 
   try {
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
   }
 
-  const { report_type, format, date_from, date_to, property_ids } = body;
+  const { report_type, format, date_from, date_to, property_ids, stream } = body;
 
   if (!report_type || !format || !date_from || !date_to) {
     return NextResponse.json({ error: 'Please fill in all required fields.' }, { status: 400 });
@@ -101,6 +102,15 @@ export async function POST(request: Request) {
     });
 
     const buffer = format === 'pdf' ? await generatePdf(data) : await generateExcel(data);
+
+    // Mobile requests stream=true — return bytes directly, skip storage
+    if (stream) {
+      const contentType = format === 'pdf'
+        ? 'application/pdf'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      await serviceClient.from('report_history').update({ status: 'completed', file_size_kb: Math.round(buffer.length / 1024) }).eq('id', reportId);
+      return new Response(buffer, { status: 200, headers: { 'Content-Type': contentType, 'Content-Disposition': `attachment; filename="report.${format === 'pdf' ? 'pdf' : 'xlsx'}"` } });
+    }
 
     const ext = format === 'pdf' ? 'pdf' : 'xlsx';
     const storagePath = `reports/${user.id}/${reportId}.${ext}`;
