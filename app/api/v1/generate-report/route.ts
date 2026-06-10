@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { fetchReportData } from '@/lib/reports/fetch-data';
 import { generatePdf } from '@/lib/reports/generate-pdf';
 import { generateExcel } from '@/lib/reports/generate-excel';
@@ -9,13 +9,26 @@ import type { ReportType, ReportFormat } from '@/lib/reports/types';
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
+  // Auth: cookie session (web) or Bearer token (mobile)
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  let { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    const bearer = request.headers.get('Authorization')?.replace('Bearer ', '');
+    if (bearer) {
+      const { data } = await supabase.auth.getUser(bearer);
+      user = data.user;
+    }
+  }
+
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
+  // All subsequent DB operations use admin client — works regardless of auth method
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin
     .from('user_profiles')
     .select('role')
     .eq('id', user.id)
@@ -41,16 +54,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
   }
 
-  const { report_type, format, date_from, date_to, property_ids, stream } = body;
+  const { report_type: raw_report_type, format, date_from, date_to, property_ids, stream } = body;
 
-  if (!report_type || !format || !date_from || !date_to) {
+  if (!raw_report_type || !format || !date_from || !date_to) {
     return NextResponse.json({ error: 'Please fill in all required fields.' }, { status: 400 });
   }
+
+  // Normalize mobile report types ('full'|'income'|'expenses') to valid DB values
+  const VALID_DB_TYPES = new Set<string>(['monthly', 'annual', 'property', 'country', 'manager']);
+  const report_type: ReportType = VALID_DB_TYPES.has(raw_report_type) ? (raw_report_type as ReportType) : 'property';
 
   // Scope check for non-SA
   let scopedIds = property_ids && property_ids.length > 0 ? property_ids : null;
   if (role !== 'super_admin') {
-    const { data: assignments } = await supabase
+    const { data: assignments } = await admin
       .from('property_assignments')
       .select('property_id')
       .eq('user_id', user.id)
@@ -65,7 +82,7 @@ export async function POST(request: Request) {
   }
 
   // Create placeholder record
-  const { data: historyRow, error: insertErr } = await supabase
+  const { data: historyRow, error: insertErr } = await admin
     .from('report_history')
     .insert({
       report_type,
@@ -81,19 +98,14 @@ export async function POST(request: Request) {
     .single();
 
   if (insertErr || !historyRow) {
+    console.error('report_history insert error:', insertErr?.code, insertErr?.message);
     return NextResponse.json({ error: 'Failed to create report record.' }, { status: 500 });
   }
 
   const reportId = historyRow.id;
 
-  // Service client used for all writes after auth — bypasses RLS for status updates
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
   try {
-    const data = await fetchReportData(supabase, {
+    const data = await fetchReportData(admin, {
       report_type,
       format,
       date_from,
@@ -108,8 +120,8 @@ export async function POST(request: Request) {
       const contentType = format === 'pdf'
         ? 'application/pdf'
         : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      await serviceClient.from('report_history').update({ status: 'completed', file_size_kb: Math.round(buffer.length / 1024) }).eq('id', reportId);
-      return new Response(buffer, { status: 200, headers: { 'Content-Type': contentType, 'Content-Disposition': `attachment; filename="report.${format === 'pdf' ? 'pdf' : 'xlsx'}"` } });
+      await admin.from('report_history').update({ status: 'completed', file_size_kb: Math.round(buffer.length / 1024) }).eq('id', reportId);
+      return new Response(new Uint8Array(buffer), { status: 200, headers: { 'Content-Type': contentType, 'Content-Disposition': `attachment; filename="report.${format === 'pdf' ? 'pdf' : 'xlsx'}"` } });
     }
 
     const ext = format === 'pdf' ? 'pdf' : 'xlsx';
@@ -118,13 +130,13 @@ export async function POST(request: Request) {
       ? 'application/pdf'
       : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-    const { error: uploadErr } = await serviceClient.storage
+    const { error: uploadErr } = await admin.storage
       .from('reports')
       .upload(storagePath, buffer, { contentType, upsert: false });
 
     if (uploadErr) throw new Error(uploadErr.message);
 
-    const { error: updateErr } = await serviceClient
+    const { error: updateErr } = await admin
       .from('report_history')
       .update({
         status: 'completed',
@@ -138,7 +150,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, reportId });
   } catch (err) {
     console.error('generateReport error:', err);
-    await serviceClient
+    await admin
       .from('report_history')
       .update({ status: 'failed' })
       .eq('id', reportId);
