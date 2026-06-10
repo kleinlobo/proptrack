@@ -60,7 +60,7 @@ function fmtCurrency(amount: number, currency: string): string {
 
 function ReportDocument({ data, logoDataUri }: { data: ReportData; logoDataUri: string | null }) {
   const dateRange = `${format(new Date(data.params.date_from), 'dd MMM yyyy')} – ${format(new Date(data.params.date_to), 'dd MMM yyyy')}`;
-  const generatedAt = format(new Date(data.generated_at), "dd MMM yyyy 'at' HH:mm");
+  const generatedAt = format(new Date(data.generated_at), "dd MMM yyyy 'at' HH:mm '(UTC)'");
 
   const aedSummaries = data.property_summaries.filter(ps => ps.base_currency === 'AED');
   const inrSummaries = data.property_summaries.filter(ps => ps.base_currency === 'INR');
