@@ -66,6 +66,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid date range.' }, { status: 400 });
   }
 
+  // Auto-expire any generating records older than 10 minutes (prevents permanent lockout)
+  await admin
+    .from('report_history')
+    .update({ status: 'failed' })
+    .eq('generated_by', user.id)
+    .eq('status', 'generating')
+    .lt('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+
   // F7: Prevent concurrent report generation per user
   const { count: inFlight } = await admin
     .from('report_history')
@@ -73,7 +81,7 @@ export async function POST(request: Request) {
     .eq('generated_by', user.id)
     .eq('status', 'generating');
 
-  if ((inFlight ?? 0) >= 2) {
+  if ((inFlight ?? 0) >= 1) {
     return NextResponse.json(
       { error: 'A report is already being generated. Please wait.' },
       { status: 429 }
