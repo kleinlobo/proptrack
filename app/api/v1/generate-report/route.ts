@@ -60,6 +60,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Please fill in all required fields.' }, { status: 400 });
   }
 
+  // F8: Validate date format and range
+  const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  if (!ISO_DATE.test(date_from) || !ISO_DATE.test(date_to) || date_from > date_to) {
+    return NextResponse.json({ error: 'Invalid date range.' }, { status: 400 });
+  }
+
+  // F7: Prevent concurrent report generation per user
+  const { count: inFlight } = await admin
+    .from('report_history')
+    .select('id', { count: 'exact', head: true })
+    .eq('generated_by', user.id)
+    .eq('status', 'generating');
+
+  if ((inFlight ?? 0) >= 2) {
+    return NextResponse.json(
+      { error: 'A report is already being generated. Please wait.' },
+      { status: 429 }
+    );
+  }
+
   // Normalize mobile report types ('full'|'income'|'expenses') to valid DB values
   const VALID_DB_TYPES = new Set<string>(['monthly', 'annual', 'property', 'country', 'manager']);
   const report_type: ReportType = VALID_DB_TYPES.has(raw_report_type) ? (raw_report_type as ReportType) : 'property';

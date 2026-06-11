@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { randomUUID } from 'crypto';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'application/pdf'];
@@ -44,10 +44,7 @@ export async function POST(req: NextRequest) {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin';
   const path = `receipts/${user.id}/${randomUUID()}.${ext}`;
 
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const serviceClient = createAdminClient();
 
   const bytes = await file.arrayBuffer();
   const { error } = await serviceClient.storage
